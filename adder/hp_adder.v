@@ -470,20 +470,29 @@ module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
 	always @(*)
 	begin
 		case(ex_diff[4])
-		1'b0 : sign_A = hp_inA[15];
-		1'b1 : sign_A = hp_inB[15];
-		default : sign_A = 1'bz;
+		1'b0 :begin 
+			sign_A = hp_inA[15];
+			sign_B = hp_inB[15];
+		end
+		1'b1 : begin
+			sign_A = hp_inB[15];
+			sign_B = hp_inA[15];
+		end
+		default : begin
+			sign_A = 1'bz;
+			sign_B = 1'bz;
+		end
 		endcase
 	end
 
-    always @(*)
-	begin
-		case(ex_diff[4])
-		1'b0 : sign_B = hp_inB[15];
-		1'b1 : sign_B = hp_inA[15];
-		default : sign_B = 1'bz;
-		endcase
-	end
+    // always @(*)
+	// begin
+	// 	case(ex_diff[4])
+	// 	1'b0 : sign_B = hp_inB[15];
+	// 	1'b1 : sign_B = hp_inA[15];
+	// 	default : sign_B = 1'bz;
+	// 	endcase
+	// end
 
     wire [15:0] bs_out;
 
@@ -568,6 +577,46 @@ module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
 
 	
 endmodule
+
+module tb_hp_adder();
+	reg [15:0]A,B;
+	reg operation;
+
+	wire [15:0]out;
+	wire [1:0]E;
+
+	hp_adder uut(.hp_sum(out), .exceptions(E), .hp_inA(A), .hp_inB(B), .op(operation));
+	initial 
+	begin
+		A = 16'd0; B = 16'd4095; operation = 1'b0;
+		#10 A = 16'd8191; B = 16'd0;
+		#10 A = 16'd0; B = 16'd0;
+		#10 A = 16'b0111110101010101; B = 16'd4095;
+		#10 A = 16'd8191; B  = 16'b1111110000011111;
+		#10 A = 16'b1111110101010101; B = 16'd4095;
+		#10 A = 16'd8191; B  = 16'b0111110000011111;
+		#10 A = 16'd8191; B  = 16'b1111110000000000;
+		#10 A = 16'b1111110000000000; B = 16'd4095;
+		#10 A = 16'd8191; B  = 16'b0111110000000000;
+		#10 A = 16'b0111110000000000; B = 16'd4095;
+		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;
+		#10 A = 16'b1111101010101010; B = 16'b1111100101010101;
+		#10 A = 16'b0000011010101010; B = 16'b0000010101010101;
+		#10 A = 16'b1000011010101010; B = 16'b1000010101010101;
+		#10 A = 16'b0101001010101010; B = 16'b0110000101010101;
+		#10 A = 16'b1101001010101010; B = 16'b1110000101010101;
+		#10 A = 16'b0101001010101010; B = 16'b1110000101010101;
+		#10 A = 16'b1101001010101010; B = 16'b0110000101010101;
+		#10 A = 16'b0010101111111111; B = 16'b0110001111111111;
+		#10 A = 16'b1010101111111111; B = 16'b1110001111111111;	
+	end
+	initial begin
+      $monitor("A=%d, B=%d, Output=%b, Exception=%b",A,B,out,E);
+    end
+	initial begin
+		#220 $finish;
+	end
+	endmodule
 
 	
 
