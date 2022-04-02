@@ -361,11 +361,18 @@ end
 endmodule
 
 
-module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
+module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB, op);
+
+	// control flags
+	wire [1:0] cf;
+
+	// inf/NaN
+
+	// normal
 
     input [15:0] hp_inA, hp_inB;
     output [15:0] hp_sum;
-    output [1:0] exceptions;
+    output [1:0] ex_flag;
 
 	input op;
 
@@ -394,7 +401,8 @@ module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
 	begin
 		if(hp_inA[14:0] == 15'd0)
 		begin
-			ma = {1'b0, hp_inA[9:0], 2'b0};
+			//ma = {1'b0, hp_inA[9:0], 2'b0};
+			cf = 2'b01;
 		end
 		else
 		begin
@@ -402,11 +410,16 @@ module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
 		end
 		if(hp_inB[14:0] == 15'd0)
 		begin
-			mb = {1'b0, hp_inA[9:0], 2'b0};
+			//mb = {1'b0, hp_inA[9:0], 2'b0};
+			cf = 2'10;
 		end
 		else
 		begin
 			mb = {1'b1, hp_inA[9:0], 2'b0};
+		end
+		if(hp_inA[14:10] == 5'd31 || hp_inB[14:10] ==== 5'd31)
+		begin
+			cf = 2'00;
 		end
 	end
 
@@ -564,6 +577,29 @@ module hp_adder(hp_sum, exceptions, hp_inA, hp_inB, op);
 		endcase
 	end
 
+	always @(*)
+	begin
+		case(cf)
+		2'b00:begin
+			hp_sum = 16'b0111110101010101;
+			ex_flag = 2'b11;
+		end
+
+		2'b01: begin
+			hp_sum = hp_inB;
+			ex_flag = 2'b00;
+		end
+
+		2'b10: begin
+			hp_sum = hp_inA;
+			ex_flag = 2'b00;
+		end
+
+		2'b11: begin
+			
+
+
+
 	
 
 
@@ -585,7 +621,7 @@ module tb_hp_adder();
 	wire [15:0]out;
 	wire [1:0]E;
 
-	hp_adder uut(.hp_sum(out), .exceptions(E), .hp_inA(A), .hp_inB(B), .op(operation));
+	hp_adder uut(.hp_sum(out), .ex_flag(E), .hp_inA(A), .hp_inB(B), .op(operation));
 	initial 
 	begin
 		A = 16'd0; B = 16'd4095; operation = 1'b0;
