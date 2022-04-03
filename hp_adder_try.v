@@ -364,6 +364,7 @@ endmodule
 
 module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
+
     input [15:0] hp_inA, hp_inB_uns;
     output reg[15:0] hp_sum;
     output reg[1:0] ex_flag;
@@ -457,22 +458,7 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 		endcase
 	end
 
-
-    //ex_diff-> ctrl??
-	reg [3:0] ctrl;
-	always @(*)
-	begin
-		if(ex_diff >= 5'd13)
-		begin
-			ctrl = 4'd13;
-		end
-		else
-		begin
-			ctrl = ex_diff[3:0];
-		end
-	end
-
-	reg sign_A = 1'b0;
+    reg sign_A = 1'b0;
 	reg sign_B = 1'b0;
 
 	always @(*)
@@ -506,10 +492,7 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
     barrel_shifter bs(.Y(bs_out), .A(bs_in), .S(ctrl), .rl(1'b0));
 
-	reg [14:0] adder_in_B;
-	always @(*)begin
-		adder_in_B =  bs_out[15:1];
-	end
+	reg [14:0] adder_in_B = bs_out[15:1];
 
 	always @(*)
 	begin
@@ -545,9 +528,9 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 	wire [12:0] norm_out;
 	wire [3:0] shamt;
 
-	priority_encoder pri_enc_1(.Y(norm_out), .A(shamt), .X({adder_out, 1'b0}));
+	priority_encoder pri_enc_1({adder_out, 1'b0}, shamt, norm_out);
 
-	wire[10:0] round_out;
+	wire[12:0] round_out;
 	wire round_OF;
 
 
@@ -567,14 +550,14 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 	begin
 		case(round_OF)
 		1'b0 : begin
-			final_mant = round_out[10:3];
+			final_mant = round_out[12:3];
 			signed_exp = {1'b0, big_exp} - shamt; //UF?
 			exp_UF = signed_exp[5];
 			exp_OF = 1'b0;
 		end
 
 		1'b1 :begin
-			final_mant = {round_OF, round_out[10:4]};
+			final_mant = {round_OF, round_out[12:4]};
 			signed_exp = {1'b0, big_exp} - shamt + 1; //OF?
 			exp_OF = signed_exp[5];
 			exp_UF = 1'b0;
