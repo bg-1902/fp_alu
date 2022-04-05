@@ -344,17 +344,17 @@ module priority_encoder(Y, A, X);
 	end  
 endmodule
 
-module rounder (sigout, ov, sigin);
+module rounder (mant_out, ov, mant_in);
 
-input [12:0] sigin;
-output reg [10:0] sigout;
+input [12:0] mant_in;
+output reg [10:0] mant_out;
 output reg ov;
 
 always @ (*) begin
     ov = 1'b0;
-    case (sigin[1])
-    1'b0: sigout[10:0] = sigin[12:2];
-    1'b1: {ov, sigout[10:0]} = sigin[12:2] + 1'b1;
+    case (mant_in[1])
+    1'b0: mant_out[10:0] = mant_in[12:2];
+    1'b1: {ov, mant_out[10:0]} = mant_in[12:2] + 1'b1;
     endcase
     
 end
@@ -382,15 +382,17 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 	begin
 		if(op)
 		begin
-			hp_inB[15] = ~hp_inB_uns[15];
+			hp_inB = {~hp_inB_uns[15], hp_inB_uns[14:0]};
 		end
 		else
 		begin
-			hp_inB[15] = hp_inB_uns[15];
+			hp_inB = hp_inB_uns;
 		end
 	end
 
-
+	// control flags
+	reg [1:0] cf;
+	reg exp_OF, exp_UF;
 
 
 	always @(*)
@@ -400,23 +402,22 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 			//ma = {1'b0, hp_inA[9:0], 2'b0};
 			cf = 2'b01;
 		end
-		else
-		begin
-			ma = {1'b1, hp_inA[9:0], 2'b0};
-		end
-		if(hp_inB[14:0] == 15'd0)
+		else if(hp_inB[14:0] == 15'd0)
 		begin
 			//mb = {1'b0, hp_inA[9:0], 2'b0};
 			cf = 2'b10;
 		end
-		else
-		begin
-			mb = {1'b1, hp_inA[9:0], 2'b0};
-		end
-		if(hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
+		else if(hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
 		begin
 			cf = 2'b00;
 		end
+		else
+		begin
+			ma = {1'b1, hp_inA[9:0], 2'b0};
+			mb = {1'b1, hp_inA[9:0], 2'b0};
+			cf = 2'b11;
+		end
+
 	end
 
     wire [4:0] ex_diff;
@@ -432,6 +433,8 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
     reg [14:0] adder_in_A = 15'd0;
     reg [15:0] bs_in = 16'd0;
 
+	reg final_sign;
+
 	reg [4:0] big_exp;
     always @(*)
 	begin
@@ -439,10 +442,13 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 		1'b0 :begin
 			adder_in_A = {2'b0, ma, 2'b0};
 			big_exp = ea;
+			//final_sign = hp_inA[15];
+
 		end
 		1'b1 : begin
 			adder_in_A = {2'b0, mb, 2'b0};
 			big_exp = eb;
+			//final_sign = hp_inB[15];
 		end
 		default : adder_in_A = 15'bz;
 		endcase
@@ -536,11 +542,27 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 	end
 
 
-	wire [14:0] adder_out;
+	wire [14:0] adder_out_neg;
 	wire adder_cout;
 	wire adder_ovf;
 
-	ripple_carry_15bits adder_1(adder_out,adder_cout, adder_ovf, adder_in_A,adder_in_B, 1'b0);
+	ripple_carry_15bits adder_1(adder_out_neg,adder_cout, adder_ovf, adder_in_A,adder_in_B, 1'b0);
+
+	reg [14:0] adder_out;
+
+	always @(*)
+	begin
+		case(adder_out_neg[14])
+		1'b0: begin
+			adder_out = adder_out_neg;
+			final_sign = 1'b0;
+		end
+		1'b1: begin
+			adder_out = ~adder_out_neg + 1'b1;
+			final_sign = 1'b1;
+		end
+	endcase
+	end
 
 	wire [12:0] norm_out;
 	wire [3:0] shamt;
@@ -555,27 +577,23 @@ module hp_adder(hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
 	reg [9:0] final_mant;
 	reg [5:0] signed_exp;
-	wire final_sign;
-
-	// control flags
-	reg [1:0] cf;
-	reg exp_OF, exp_UF;
-
-
+	
 
 	always @(*)
 	begin
 		case(round_OF)
 		1'b0 : begin
-			final_mant = round_out[10:3];
-			signed_exp = {1'b0, big_exp} - shamt; //UF?
+			// final_mant = round_out[10:3];
+			final_mant = round_out[9:2];
+			signed_exp = {1'b0, big_exp} - shamt -1; //UF?
 			exp_UF = signed_exp[5];
 			exp_OF = 1'b0;
 		end
 
 		1'b1 :begin
-			final_mant = {round_OF, round_out[10:4]};
-			signed_exp = {1'b0, big_exp} - shamt + 1; //OF?
+			// final_mant = {round_OF, round_out[10:4]};
+			final_mant = round_out[10:3];
+			signed_exp = {1'b0, big_exp} - shamt; //OF?
 			exp_OF = signed_exp[5];
 			exp_UF = 1'b0;
 		end
@@ -630,30 +648,14 @@ module tb_hp_adder();
 	hp_adder uut(.hp_sum(out), .ex_flag(E), .hp_inA(A), .hp_inB_uns(B), .op(operation));
 	initial 
 	begin
-		A = 16'd0; B = 16'd4095; operation = 1'b0;
+		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b1; //1000000000000001
 		#10 A = 16'd8191; B = 16'd0;
 		#10 A = 16'd0; B = 16'd0;
-		#10 A = 16'b0111110101010101; B = 16'd4095;
-		#10 A = 16'd8191; B  = 16'b1111110000011111;
-		#10 A = 16'b1111110101010101; B = 16'd4095;
-		#10 A = 16'd8191; B  = 16'b0111110000011111;
-		#10 A = 16'd8191; B  = 16'b1111110000000000;
-		#10 A = 16'b1111110000000000; B = 16'd4095;
-		#10 A = 16'd8191; B  = 16'b0111110000000000;
-		#10 A = 16'b0111110000000000; B = 16'd4095;
-		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;
-		#10 A = 16'b1111101010101010; B = 16'b1111100101010101;
-		#10 A = 16'b0000011010101010; B = 16'b0000010101010101;
-		#10 A = 16'b1000011010101010; B = 16'b1000010101010101;
-		#10 A = 16'b0101001010101010; B = 16'b0110000101010101;
-		#10 A = 16'b1101001010101010; B = 16'b1110000101010101;
-		#10 A = 16'b0101001010101010; B = 16'b1110000101010101;
-		#10 A = 16'b1101001010101010; B = 16'b0110000101010101;
-		#10 A = 16'b0010101111111111; B = 16'b0110001111111111;
-		#10 A = 16'b1010101111111111; B = 16'b1110001111111111;	
+		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;//0111000101010100
+		#10 A = 16'b0111101010101010; B = 16'b0110100101010101;//0111101001010101
 	end
 	initial begin
-      $monitor("A=%d, B=%d, Output=%b, Exception=%b",A,B,out,E);
+      $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
     end
 	initial begin
 		#220 $finish;

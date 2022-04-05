@@ -57,11 +57,13 @@ endmodule
 
 
 
-module hp_multiplier(hp_product,Exceptions,hp_inA,hp_inB);
-	output [15:0]hp_product;
-	output reg [1:0]Exceptions;
+module hp_multiplier(hp_product,ex_flag,hp_inA,hp_inB);
+	output reg[15:0]hp_product;
+	output reg [1:0]ex_flag;
 	input [15:0]hp_inA;
 	input [15:0]hp_inB;
+
+	reg exp_OF, exp_UF;
 	
 	wire A_s;
 	wire B_s;
@@ -77,55 +79,86 @@ module hp_multiplier(hp_product,Exceptions,hp_inA,hp_inB);
 	wire product_s;
 	assign product_s = A_s ^ B_s;
 	
-	wire [4:0]product_exp_temp;
-	wire [4:0]product_exp;
+	wire [6:0]product_exp_temp;
+	wire [6:0]product_exp;
 	
-	assign product_exp_temp = A_exp + B_exp;
-	assign product_exp = product_exp_temp -15;
+	assign product_exp_temp = {2'b0, A_exp} + {2'b0, B_exp};
+	assign product_exp = product_exp_temp - 7'd15;
+
+
 	
 
 	//booth_multiplier
 	reg [11:0] ma,mb;
+
+	// control flags
+	reg [1:0] cf;
+
+
 	always @(*)
 	begin
-		assign ma = 12'd0;
-		assign mb = 12'd0;
 		if(hp_inA[14:0] == 15'd0)
 		begin
-			ma = {2'b00, hp_inA[9:0]};
+			//ma = {1'b0, hp_inA[9:0], 2'b0};
+			cf = 2'b01;
+		end
+		else if(hp_inB[14:0] == 15'd0)
+		begin
+			//mb = {1'b0, hp_inA[9:0], 2'b0};
+			cf = 2'b10;
+		end
+		else if(hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
+		begin
+			cf = 2'b00;
 		end
 		else 
 		begin
 			ma = {2'b01, hp_inA[9:0]};
+			mb = {2'b01, hp_inA[9:0]};
+			cf = 2'b11;
 		end
-		if(hp_inB[14:0] == 15'd0)
-		begin
-			mb = {2'b00, hp_inB[9:0]};
-		end
-		else
-		begin
-			mb = {2'b01, hp_inB[9:0]};
-		end
+
+
 	end
 
 	wire [23:0]product_temp;
 	radix4_booth_multiplier mult1(product_temp,ma,mb);
 
-	reg [23:0] product_temp_norm;
-	reg [4:0]product_exp_norm;
+	reg [9:0] product_temp_norm;
+	reg [6:0]product_exp_norm;
 	 always @(*)
 	 begin
 	 	if(product_temp[21]==1)
 	 	begin
-	 		product_temp_norm = product_temp>>1;
-	 		product_exp_norm = product_exp +1;
+	 		product_temp_norm = product_temp[21:12];
+	 		product_exp_norm = product_exp + 7'd1;
+			
 	 	end
 	 	else
 		begin
-	 		product_temp_norm = product_temp;
+	 		product_temp_norm = product_temp[20:11];
 			product_exp_norm = product_exp;
 		end
 	 end
+	always @(*)
+	begin
+		if($signed(product_exp_norm)>=31)
+		begin
+			exp_OF = 1'b1;
+			exp_UF = 1'b0;
+		end
+		else if($signed(product_exp_norm)<0)
+		begin
+			exp_OF = 1'b0;
+			exp_UF = 1'b1;
+		end
+		else
+		begin
+			exp_OF = 1'b0;
+			exp_UF = 1'b0;
+		end
+	end
+
 	// wire xnor_op;
 	// xnor xn1 (xnor_op, product_temp[21], 1);
 	// assign xnor_op = {24{xnor_op}};
@@ -133,34 +166,67 @@ module hp_multiplier(hp_product,Exceptions,hp_inA,hp_inB);
 	// assign product_temp = (xnor_op&(product_temp>>1)) + (xnor_op&product_temp);
 	// assign product_exp = (xnor_op&(product_exp+1'b1))  + (xnor_op&product_exp);
 
-	assign hp_product = {product_s,product_exp,product_temp_norm[19:10]};
+	// assign hp_product = {product_s,product_exp,product_temp_norm[19:10]};
+	// always @(*)
+	// begin
+	// 	assign ex_flag = 2'd0;
+	// 	if (hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
+	// 	begin
+	// 		assign ex_flag = 2'b11;
+	// 	end
+	// 	else if (product_exp<31 && product_exp>=0)
+	// 	begin
+	// 		assign ex_flag = 2'b00;
+	// 	end
+	// 	else if(product_exp>=31)
+	// 	begin
+	// 		assign ex_flag = 2'b01;
+	// 	end
+	// 	else
+	// 	begin
+	// 		assign ex_flag = 2'b10;
+	// 	end
+	// end
+
 	always @(*)
 	begin
-		assign Exceptions = 2'd0;
-		if (hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
-		begin
-			assign Exceptions = 2'b11;
+		case(cf)
+		2'b00:begin
+			hp_product = 16'b0111110101010101;
+			ex_flag = 2'b11;
 		end
-		else if (product_exp<31 && product_exp>=0)
-		begin
-			assign Exceptions = 2'b00;
+
+		2'b01: begin
+			hp_product = 16'd0;
+			ex_flag = 2'b00;
 		end
-		else if(product_exp>=31)
-		begin
-			assign Exceptions = 2'b01;
+
+		2'b10: begin
+			hp_product = 16'd0;
+			ex_flag = 2'b00;
 		end
-		else
-		begin
-			assign Exceptions = 2'b10;
+
+		2'b11: begin
+			hp_product = {product_s,product_exp_norm[4:0],product_temp_norm};
+			ex_flag = {exp_UF, exp_OF};
 		end
+		default: begin
+			hp_product = 16'bz;
+			ex_flag = 2'b11;
+		end
+	endcase
 	end
+
+
+
 endmodule
+
 
 module tb_hp_multiplier();
 	reg [15:0]A,B;
 	wire [15:0]out;
 	wire [1:0]E;
-	hp_multiplier uut(.hp_product(out), .Exceptions(E), .hp_inA(A), .hp_inB(B));
+	hp_multiplier uut(.hp_product(out), .ex_flag(E), .hp_inA(A), .hp_inB(B));
 	initial 
 	begin
 		A = 16'd0; B = 16'd4095;
@@ -180,13 +246,14 @@ module tb_hp_multiplier();
 		#10 A = 16'b1000011010101010; B = 16'b1000010101010101;
 		#10 A = 16'b0101001010101010; B = 16'b0110000101010101;
 		#10 A = 16'b1101001010101010; B = 16'b1110000101010101;
-		#10 A = 16'b0101001010101010; B = 16'b1110000101010101;
+		#10 A = 16'b0010001010101010; B = 16'b0010000101010101;
 		#10 A = 16'b1101001010101010; B = 16'b0110000101010101;
 		#10 A = 16'b0010101111111111; B = 16'b0110001111111111;
-		#10 A = 16'b1010101111111111; B = 16'b1110001111111111;	
+		#10 A = 16'b1000011111111111; B = 16'b1000011111111111;
+
 	end
 	initial begin
-      $monitor("A=%d, B=%d, Output=%b, Exception=%b",A,B,out,E);
+      $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
     end
 	initial begin
 		#220 $finish;
