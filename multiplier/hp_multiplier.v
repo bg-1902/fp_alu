@@ -130,13 +130,13 @@ module hp_multiplier(hp_product,ex_flag,hp_inA,hp_inB);
 	 begin
 	 	if(product_temp[21]==1)
 	 	begin
-	 		product_temp_norm = product_temp[21:12];
+	 		product_temp_norm = product_temp[20:11];
 	 		product_exp_norm = product_exp + 7'd1;
 			
 	 	end
 	 	else
 		begin
-	 		product_temp_norm = product_temp[20:11];
+	 		product_temp_norm = product_temp[19:10];
 			product_exp_norm = product_exp;
 		end
 	 end
@@ -250,12 +250,14 @@ module tb_hp_multiplier();
 		#10 A = 16'b1101001010101010; B = 16'b0110000101010101;
 		#10 A = 16'b0010101111111111; B = 16'b0110001111111111;
 		#10 A = 16'b1000011111111111; B = 16'b1000011111111111;
+		#10 A = 16'b0100100000000000; B = 16'b0101100000000000;
+		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;// 10 * 5
 
 	end
 	initial begin
       $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
     end
 	initial begin
-		#220 $finish;
+		#300 $finish;
 	end
 	endmodule

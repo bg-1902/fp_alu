@@ -675,21 +675,20 @@ module tb_hp_adder();
 
 	wire [15:0]out;
 	wire [1:0]E;
+    wire [10:0] round_out;
 
-	hp_adder uut(.hp_sum(out), .ex_flag(E), .hp_inA(A), .hp_inB_uns(B), .op(operation));
+	hp_adder uut(.round_out(round_out), .hp_sum(out), .ex_flag(E), .hp_inA(A), .hp_inB_uns(B), .op(operation));
 	initial 
 	begin
-		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b1; //1000000000000001
-		#10 A = 16'd8191; B = 16'd0;
-		#10 A = 16'd0; B = 16'd0;
+		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b0; //1000000000000001
+		// #10 A = 16'd8191; B = 16'd0;
+		// #10 A = 16'd0; B = 16'd0;
 		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;//0111000101010100
 		#10 A = 16'b0100010100000000; B = 16'b0100101110000000;//
-		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;// 10 + 5
-		#10 A = 16'b0100100100000000; B = 16'b1100010100000000;// 10 + (-5)
 		
 	end
 	initial begin
-      $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
+      $monitor("A=%b, B=%b, Output=%b, Exception=%b round_out = %b",A,B,out,E, round_out);
     end
 	initial begin
 		#220 $finish;
