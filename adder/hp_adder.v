@@ -397,15 +397,23 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
 	always @(*)
 	begin
-		if(hp_inA[14:0] == 15'd0)
+		if(hp_inA[14:10] == 5'd0 && hp_inB[14:10] == 5'd0)
 		begin
 			ma = {1'b0, hp_inA[9:0], 2'b0};
+			mb = {1'b0, hp_inB[9:0], 2'b0};
 			cf = 2'b01;
 		end
-		else if(hp_inB[14:0] == 15'd0)
+		else if(hp_inA[14:10] == 5'd0)
 		begin
+			ma = {1'b0, hp_inA[9:0], 2'b0};
+			mb = {1'b1, hp_inB[9:0], 2'b0};
+			cf = 2'b11;
+		end
+		else if(hp_inB[14:10] == 5'd0)
+		begin
+			ma = {1'b1, hp_inA[9:0], 2'b0};
 			mb = {1'b0, hp_inB[9:0], 2'b0};
-			cf = 2'b10;
+			cf = 2'b11;
 		end
 		else if(hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
 		begin
@@ -592,7 +600,16 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
 	reg [9:0] final_mant;
 	reg [6:0] signed_exp;
-	
+	reg [4:0] zexp_temp_exp;
+
+
+	always @(*)
+	begin
+		case(adder_out[12])
+		1'b0: zexp_temp_exp = 5'd0;
+		1'b1: zexp_temp_exp = 5'b00001;
+		endcase
+	end
 
 	always @(*)
 	begin
@@ -648,7 +665,7 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 		end
 
 		2'b01: begin
-			hp_sum = hp_inB;
+			hp_sum = {final_sign, zexp_temp_exp, adder_out[11:2]};
 			ex_flag = 2'b00;
 		end
 
@@ -679,13 +696,16 @@ module tb_hp_adder();
 	hp_adder uut(.hp_sum(out), .ex_flag(E), .hp_inA(A), .hp_inB_uns(B), .op(operation));
 	initial 
 	begin
-		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b1; //1000000000000001
+		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b0; //1000000000000001
 		#10 A = 16'd8191; B = 16'd0;
 		#10 A = 16'd0; B = 16'd0;
 		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;//0111000101010100
 		#10 A = 16'b0100010100000000; B = 16'b0100101110000000;//
 		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;// 10 + 5
 		#10 A = 16'b0100100100000000; B = 16'b1100010100000000;// 10 + (-5)
+		#10 A = 16'b0000001000000000; B = 16'b0000001000000000;//0000010000000000
+		#10 A = 16'b0000001111000000; B = 16'b0000001000001110;
+		
 		
 	end
 	initial begin

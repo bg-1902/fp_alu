@@ -113,9 +113,26 @@ module hp_multiplier(hp_product,ex_flag,hp_inA,hp_inB);
 		end
 		else 
 		begin
-			ma = {2'b01, hp_inA[9:0]};
-			mb = {2'b01, hp_inA[9:0]};
-			cf = 2'b11;
+			if(hp_inA[14:10] == 5'd0)
+			begin
+				ma = {2'b00, hp_inA[9:0]};
+				cf = 2'b11;
+			end
+			else 
+			begin
+				ma = {2'b01, hp_inA[9:0]};
+				cf = 2'b11;
+			end
+			if(hp_inB[14:10] == 5'd0)
+			begin
+				mb = {2'b00, hp_inB[9:0]};
+				cf = 2'b11;
+			end
+			else 
+			begin
+				mb = {2'b01, hp_inB[9:0]};
+				cf = 2'b11;
+			end
 		end
 
 
@@ -159,34 +176,6 @@ module hp_multiplier(hp_product,ex_flag,hp_inA,hp_inB);
 		end
 	end
 
-	// wire xnor_op;
-	// xnor xn1 (xnor_op, product_temp[21], 1);
-	// assign xnor_op = {24{xnor_op}};
-
-	// assign product_temp = (xnor_op&(product_temp>>1)) + (xnor_op&product_temp);
-	// assign product_exp = (xnor_op&(product_exp+1'b1))  + (xnor_op&product_exp);
-
-	// assign hp_product = {product_s,product_exp,product_temp_norm[19:10]};
-	// always @(*)
-	// begin
-	// 	assign ex_flag = 2'd0;
-	// 	if (hp_inA[14:10] == 5'd31 || hp_inB[14:10] == 5'd31)
-	// 	begin
-	// 		assign ex_flag = 2'b11;
-	// 	end
-	// 	else if (product_exp<31 && product_exp>=0)
-	// 	begin
-	// 		assign ex_flag = 2'b00;
-	// 	end
-	// 	else if(product_exp>=31)
-	// 	begin
-	// 		assign ex_flag = 2'b01;
-	// 	end
-	// 	else
-	// 	begin
-	// 		assign ex_flag = 2'b10;
-	// 	end
-	// end
 
 	always @(*)
 	begin
@@ -252,7 +241,8 @@ module tb_hp_multiplier();
 		#10 A = 16'b1000011111111111; B = 16'b1000011111111111;
 		#10 A = 16'b0100100000000000; B = 16'b0101100000000000;
 		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;// 10 * 5
-
+		#10 A = 16'b0000001000000000; B = 16'b0000001000000000;
+		#10 A = 16'b0000001000000000; B = 16'b0100001000000000;
 	end
 	initial begin
       $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
