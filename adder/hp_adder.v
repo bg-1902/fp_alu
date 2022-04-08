@@ -7,19 +7,20 @@ module full_adder(sum,cout,a,b,cin);
 endmodule
 
 // 5bit subtractor
-module sub_5bits(d,bout,x,y,bin);
-	output [4:0]d;
+module sub_6bits(d,bout,x,y,bin);
+	output [5:0]d;
 	output bout;
-	input [4:0]x;
-	input [4:0]y;
+	input [5:0]x;
+	input [5:0]y;
 	input bin;
-	wire [3:0]b;
+	wire [5:0]b;
 	
 	full_adder sub1(d[0],b[0],x[0],~y[0],1'b1);
 	full_adder sub2(d[1],b[1],x[1],~y[1],b[0]);
 	full_adder sub3(d[2],b[2],x[2],~y[2],b[1]);
 	full_adder sub4(d[3],b[3],x[3],~y[3],b[2]);
-	full_adder sub5(d[4],bout,x[4],~y[4],b[3]);
+	full_adder sub5(d[4],b[4],x[4],~y[4],b[3]);
+	full_adder sub6(d[5],bout,x[5],~y[5],b[4]);
 endmodule
 
 module ripple_carry_15bits(sum,cout,OF,a,b,cin);
@@ -428,7 +429,7 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
 	end
 
-    wire [4:0] ex_diff_signed;
+    wire [5:0] ex_diff_signed;
     wire bor_out;
     wire bor_in = 1'b0;
 
@@ -437,7 +438,7 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 
 
     //bs_in? 
-    sub_5bits sub_ex(ex_diff_signed, bor_out, ea, eb, bor_in);
+    sub_6bits sub_ex(ex_diff_signed, bor_out, {1'b0, ea}, {1'b0, eb}, bor_in);
     reg [14:0] adder_in_A_unsigned = 15'd0;
     reg [15:0] bs_in = 16'd0;
 
@@ -446,7 +447,7 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 	reg [4:0] big_exp;
     always @(*)
 	begin
-		case(ex_diff_signed[4])
+		case(ex_diff_signed[5])
 		1'b0 :begin
 			adder_in_A_unsigned = {2'b0, ma};
 			big_exp = ea;
@@ -461,18 +462,20 @@ module hp_adder(round_out, hp_sum, ex_flag, hp_inA, hp_inB_uns, op);
 		default : adder_in_A_unsigned = 15'bz;
 		endcase
 	end
+	reg [5:0] ex_diff_signed_comp;
 	reg [4:0] ex_diff;
 
     always @(*)
 	begin
-		case(ex_diff_signed[4])
+		case(ex_diff_signed[5])
 		1'b0 : begin
 			bs_in = {2'b0, mb, 1'b0};
-			ex_diff = ex_diff_signed;
+			ex_diff = ex_diff_signed[4:0];
 		end
 		1'b1 : begin
 			bs_in = {2'b0, ma, 1'b0};
-			ex_diff = ~ex_diff_signed + 1'b1;
+			ex_diff_signed_comp = ~ex_diff_signed + 1'b1;
+			ex_diff = ex_diff_signed_comp[4:0];
 		end
 		default : begin
 			bs_in = 13'bz;
@@ -698,15 +701,24 @@ module tb_hp_adder();
 	begin
 		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b0; //1000000000000001
 		#10 A = 16'd8191; B = 16'd0;
-		#10 A = 16'd0; B = 16'd0;
+		#10 A = 16'b0000000000000000; B = 16'd0;
 		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;//0111000101010100
 		#10 A = 16'b0100010100000000; B = 16'b0100101110000000;//
 		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;// 10 + 5
 		#10 A = 16'b0100100100000000; B = 16'b1100010100000000;// 10 + (-5)
 		#10 A = 16'b0000001000000000; B = 16'b0000001000000000;//0000010000000000
 		#10 A = 16'b0000001111000000; B = 16'b0000001000001110;
-		
-		
+		#10 A = 16'b0000001111000000; B = 16'b0100010100000000;
+		A = 16'b0000010000000000; B = 16'b0000010000000001; operation = 1'b1;
+		#10 A = 16'd8191; B = 16'd0;
+		#10 A = 16'b0000000000000000; B = 16'd0;
+		#10 A = 16'b0111101010101010; B = 16'b0111100101010101;
+		#10 A = 16'b0100010100000000; B = 16'b0100101110000000;
+		#10 A = 16'b0100100100000000; B = 16'b0100010100000000;
+		#10 A = 16'b0100100100000000; B = 16'b1100010100000000;
+		#10 A = 16'b0000001000000000; B = 16'b0000001000000000;
+		#10 A = 16'b0000001111000000; B = 16'b0000001000001110;
+		#10 A = 16'b0000001111000000; B = 16'b0100010100000000;
 	end
 	initial begin
       $monitor("A=%b, B=%b, Output=%b, Exception=%b",A,B,out,E);
